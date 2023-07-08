@@ -65,6 +65,21 @@ git clone https://huggingface.co/spaces/sczhou/CodeFormer
 Refer to the [examples](./examples) provided for getting started
 with making calls to the API.
 
+## Benchmarks
+
+These benchmarks are for a source image with a resolution of 960x1280
+and a target image with a resolution of 1200x750, upscaled by 1 and
+with CodeFormer Face Restoration enabled.
+
+| System                                      | Time Taken    |
+|---------------------------------------------|---------------|
+| macOS Ventura 13.4.1 on Apple M1 Max        | 68.6 seconds  |
+| Ubuntu 22.04 LTS on t3a.xlarge AWS instance | 248.1 seconds |
+| Ubuntu 22.04 LTS on an A5000 RunPod GPU pod | 14.2 seconds  |
+| Windows 10                                  | 103.9 seconds |
+
+Get a [RunPod](https://runpod.io?ref=w18gds2n) account.
+
 ## Acknowledgements
 
 1. This project is inspired by [inswapper](https://huggingface.co/deepinsight/inswapper/tree/main).
