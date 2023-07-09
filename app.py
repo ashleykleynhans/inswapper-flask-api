@@ -9,6 +9,8 @@ import logging
 import time
 import copy
 import cv2
+import queue
+import threading
 import insightface
 import numpy as np
 from typing import List, Union
@@ -33,6 +35,42 @@ logging.basicConfig(
 )
 
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+request_queue = queue.Queue()
+
+
+def process_request():
+    while True:
+        request = request_queue.get()
+
+        try:
+            logging.debug('Swapping face')
+            face_swap_timer = Timer()
+            result_image = face_swap(request['source_image'], request['target_image'])
+            face_swap_time = face_swap_timer.get_elapsed_time()
+            logging.info(f'Time taken to swap face: {face_swap_time} seconds')
+
+            response = {
+                'status': 'ok',
+                'image': result_image
+            }
+
+            request['response_queue'].put(response)
+        except Exception as e:
+            logging.error(e)
+            response = {
+                'status': 'error',
+                'msg': 'Face swap failed',
+                'detail': str(e)
+            }
+            request['response_queue'].put(response)
+
+        # Mark the request as complete
+        request_queue.task_done()
+
+
+worker_thread = threading.Thread(target=process_request)
+worker_thread.daemon = True
+worker_thread.start()
 
 
 class Timer:
@@ -56,7 +94,7 @@ def get_args():
         '-p', '--port',
         help='Port to listen on',
         type=int,
-        default=5000
+        default=6000
     )
 
     parser.add_argument(
@@ -282,14 +320,27 @@ def face_swap_api():
     logging.info(f'Successfully saved face swap target image: {target_image_path}')
 
     try:
-        logging.debug('Swapping face')
-        face_swap_timer = Timer()
-        result_image = face_swap(source_image_path, target_image_path)
-        face_swap_time = face_swap_timer.get_elapsed_time()
-        logging.info(f'Time taken to swap face: {face_swap_time} seconds')
+        # Add the request to the queue
+        response_queue = queue.Queue()
+        request_queue.put({
+            'source_image': source_image_path,
+            'target_image': target_image_path,
+            'response_queue': response_queue
+        })
+
+        # Wait for the request to be processed
+        response = response_queue.get()
+        response_queue.task_done()
+        status_code = 200
+
     except Exception as e:
         logging.error(e)
-        raise Exception('Face swap failed')
+        response = {
+            'status': 'error',
+            'msg': 'Face swap failed',
+            'detail': str(e)
+        }
+        status_code = 500
 
     # Clean up temporary images
     logging.debug('Face swap image created successfully')
@@ -301,12 +352,7 @@ def face_swap_api():
     total_time = total_timer.get_elapsed_time()
     logging.info(f'Total time taken for face swap API call {total_time} seconds')
 
-    return make_response(jsonify(
-        {
-            'status': 'ok',
-            'image': result_image
-        }
-    ), 200)
+    return make_response(jsonify(response), status_code)
 
 
 if __name__ == '__main__':
