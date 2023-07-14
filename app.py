@@ -36,13 +36,14 @@ logging.basicConfig(
 
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 request_queue = queue.Queue()
+response_queue = queue.Queue()
 
 
-def process_request():
+def process_request(request_obj):
     try:
         logging.debug('Swapping face')
         face_swap_timer = Timer()
-        result_image = face_swap(request['source_image'], request['target_image'])
+        result_image = face_swap(request_obj['source_image'], request_obj['target_image'])
         face_swap_time = face_swap_timer.get_elapsed_time()
         logging.info(f'Time taken to swap face: {face_swap_time} seconds')
 
@@ -51,7 +52,7 @@ def process_request():
             'image': result_image
         }
 
-        request['response_queue'].put(response)
+        request_obj['response_queue'].put(response)
     except Exception as e:
         logging.error(e)
         response = {
@@ -59,7 +60,7 @@ def process_request():
             'msg': 'Face swap failed',
             'detail': str(e)
         }
-        request['response_queue'].put(response)
+        request_obj['response_queue'].put(response)
 
     # Mark the request as complete
     request_queue.task_done()
@@ -345,7 +346,6 @@ def face_swap_api():
 
     try:
         # Add the request to the queue
-        response_queue = queue.Queue()
         request_queue.put({
             'source_image': source_image_path,
             'target_image': target_image_path,
