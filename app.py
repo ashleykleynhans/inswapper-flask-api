@@ -17,6 +17,7 @@ from typing import List, Union
 from PIL import Image
 from restoration import *
 from flask import Flask, request, jsonify, make_response
+from concurrent.futures import ThreadPoolExecutor
 
 LOG_LEVEL = logging.INFO
 TMP_PATH = '/tmp/inswapper'
@@ -67,7 +68,13 @@ def process_request():
         request_queue.task_done()
 
 
-worker_thread = threading.Thread(target=process_request)
+def start_request_processing():
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        while True:
+            request = request_queue.get()
+            executor.submit(process_request, request)
+
+worker_thread = threading.Thread(target=start_request_processing)
 worker_thread.daemon = True
 worker_thread.start()
 
