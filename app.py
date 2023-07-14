@@ -39,33 +39,30 @@ request_queue = queue.Queue()
 
 
 def process_request():
-    while True:
-        request = request_queue.get()
+    try:
+        logging.debug('Swapping face')
+        face_swap_timer = Timer()
+        result_image = face_swap(request['source_image'], request['target_image'])
+        face_swap_time = face_swap_timer.get_elapsed_time()
+        logging.info(f'Time taken to swap face: {face_swap_time} seconds')
 
-        try:
-            logging.debug('Swapping face')
-            face_swap_timer = Timer()
-            result_image = face_swap(request['source_image'], request['target_image'])
-            face_swap_time = face_swap_timer.get_elapsed_time()
-            logging.info(f'Time taken to swap face: {face_swap_time} seconds')
+        response = {
+            'status': 'ok',
+            'image': result_image
+        }
 
-            response = {
-                'status': 'ok',
-                'image': result_image
-            }
+        request['response_queue'].put(response)
+    except Exception as e:
+        logging.error(e)
+        response = {
+            'status': 'error',
+            'msg': 'Face swap failed',
+            'detail': str(e)
+        }
+        request['response_queue'].put(response)
 
-            request['response_queue'].put(response)
-        except Exception as e:
-            logging.error(e)
-            response = {
-                'status': 'error',
-                'msg': 'Face swap failed',
-                'detail': str(e)
-            }
-            request['response_queue'].put(response)
-
-        # Mark the request as complete
-        request_queue.task_done()
+    # Mark the request as complete
+    request_queue.task_done()
 
 
 def start_request_processing():
