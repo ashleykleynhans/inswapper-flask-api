@@ -15,7 +15,6 @@ import insightface
 import numpy as np
 from typing import List, Union
 from PIL import Image
-from werkzeug.utils import secure_filename
 from restoration import *
 from flask import Flask, request, jsonify, make_response
 
@@ -104,6 +103,28 @@ def get_args():
     )
 
     return parser.parse_args()
+
+
+def determine_file_extension(image_data):
+    image_extension = None
+
+    try:
+        if image_data.startswith('/9j/'):
+            image_extension = '.jpg'
+        elif image_data.startswith('iVBORw0Kg'):
+            image_extension = '.png'
+        else:
+            # Default to png if we can't figure out the extension
+            image_extension = '.png'
+    except Exception as e:
+        image_extension = '.png'
+
+    return image_extension
+
+
+def write_base64_to_disk(file_b64, file_path):
+    with open(file_path, 'wb') as file:
+        file.write(base64.b64decode(file_b64))
 
 
 def get_face_swap_model(model_path: str):
@@ -294,29 +315,28 @@ def ping():
 def face_swap_api():
     total_timer = Timer()
     logging.info('Received face swap API request')
+    payload = request.get_json()
 
     if not os.path.exists(TMP_PATH):
         logging.info(f'Creating temporary directory: {TMP_PATH}')
         os.makedirs(TMP_PATH)
 
     # Get the source image file
-    source_file = request.files['source_image']
-    source_filename = secure_filename(source_file.filename)
+    source_file_b64 = payload['source_image']
     source_unique_id = uuid.uuid4()
-    source_file_extension = os.path.splitext(source_filename)[1]
+    source_file_extension = determine_file_extension(source_file_b64)
     source_image_path = f'{TMP_PATH}/{source_unique_id}{source_file_extension}'
     logging.info(f'Saving face swap source image to disk: {source_image_path}')
-    source_file.save(source_image_path)
+    write_base64_to_disk(source_file_b64, source_image_path)
     logging.info(f'Successfully saved face swap source image: {source_image_path}')
 
     # Get the target image file
-    target_file = request.files['target_image']
-    target_filename = secure_filename(target_file.filename)
+    target_file_b64 = payload['target_image']
     target_unique_id = uuid.uuid4()
-    target_file_extension = os.path.splitext(target_filename)[1]
+    target_file_extension = determine_file_extension(target_file_b64)
     target_image_path = f'{TMP_PATH}/{target_unique_id}{target_file_extension}'
     logging.info(f'Saving face swap target image to disk: {target_image_path}')
-    target_file.save(target_image_path)
+    write_base64_to_disk(target_file_b64, target_image_path)
     logging.info(f'Successfully saved face swap target image: {target_image_path}')
 
     try:
