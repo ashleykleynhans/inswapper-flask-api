@@ -37,7 +37,7 @@ logging.basicConfig(
 
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 request_queue = queue.Queue()
-response_queue = queue.Queue()
+executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
 
 def process_request(request_obj):
@@ -52,8 +52,6 @@ def process_request(request_obj):
             'status': 'ok',
             'image': result_image
         }
-
-        request_obj['response_queue'].put(response)
     except Exception as e:
         logging.error(e)
         response = {
@@ -61,22 +59,8 @@ def process_request(request_obj):
             'msg': 'Face swap failed',
             'detail': str(e)
         }
-        request_obj['response_queue'].put(response)
 
-    # Mark the request as complete
-    request_queue.task_done()
-
-
-def start_request_processing():
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        while True:
-            request = request_queue.get()
-            executor.submit(process_request, request)
-
-
-worker_thread = threading.Thread(target=start_request_processing)
-worker_thread.daemon = True
-worker_thread.start()
+    return response
 
 
 class Timer:
@@ -347,16 +331,14 @@ def face_swap_api():
     logging.info(f'Successfully saved face swap target image: {target_image_path}')
 
     try:
-        # Add the request to the queue
-        request_queue.put({
+        # Submit the request to the executor
+        future = executor.submit(process_request, {
             'source_image': source_image_path,
-            'target_image': target_image_path,
-            'response_queue': response_queue
+            'target_image': target_image_path
         })
 
         # Wait for the request to be processed
-        response = response_queue.get()
-        response_queue.task_done()
+        response = future.result()
         status_code = 200
 
     except Exception as e:
