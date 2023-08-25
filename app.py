@@ -9,8 +9,6 @@ import logging
 import time
 import copy
 import cv2
-import queue
-import threading
 import insightface
 import numpy as np
 from typing import List, Union
@@ -36,8 +34,6 @@ logging.basicConfig(
 )
 
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-request_queue = queue.Queue()
-executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
 
 def process_request(request_obj):
@@ -97,8 +93,6 @@ def get_args():
 
 
 def determine_file_extension(image_data):
-    image_extension = None
-
     try:
         if image_data.startswith('/9j/'):
             image_extension = '.jpg'
@@ -113,7 +107,7 @@ def determine_file_extension(image_data):
     return image_extension
 
 
-def write_base64_to_disk(file_b64, file_path):
+def write_base64_to_disk(file_b64: str, file_path: str):
     with open(file_path, 'wb') as file:
         file.write(base64.b64decode(file_b64))
 
@@ -163,6 +157,8 @@ def swap_face(face_swapper,
 
 def process(source_img: Union[Image.Image, List],
             target_img: Image.Image,
+            source_indexes: str,
+            target_indexes: str,
             model: str):
 
     # load face_analyser
@@ -173,85 +169,224 @@ def process(source_img: Union[Image.Image, List],
     face_swapper = get_face_swap_model(model_path)
 
     # read target image
-    target_img = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
+    target_faces = get_many_faces(face_analyser, target_img)
+    num_target_faces = len(target_faces)
+    num_source_images = len(source_img)
 
     # detect faces that will be replaced in target_img
     target_faces = get_many_faces(face_analyser, target_img)
+
     if target_faces is not None:
         temp_frame = copy.deepcopy(target_img)
-        if isinstance(source_img, list) and len(source_img) == len(target_faces):
-            # replace faces in target image from the left to the right by order
-            for i in range(len(target_faces)):
-                target_face = target_faces[i]
-                source_face = get_one_face(face_analyser, cv2.cvtColor(np.array(source_img[i]), cv2.COLOR_RGB2BGR))
-                if source_face is None:
-                    raise Exception("No source face found!")
-                temp_frame = swap_face(face_swapper, source_face, target_face, temp_frame)
+        if isinstance(source_img, list) and num_source_images == num_target_faces:
+            logging.info('Replacing the faces in the target image from left to right by order')
+            for i in range(num_target_faces):
+                source_faces = get_many_faces(face_analyser, cv2.cvtColor(np.array(source_img[i]), cv2.COLOR_RGB2BGR))
+                source_index = i
+                target_index = i
+
+                if source_faces is None:
+                    raise Exception('No source faces found!')
+
+                temp_frame = swap_face(
+                    face_swapper,
+                    source_faces,
+                    target_faces,
+                    source_index,
+                    target_index,
+                    temp_frame
+                )
+        elif num_source_images == 1:
+            # detect source faces that will be replaced into the target image
+            source_faces = get_many_faces(face_analyser, cv2.cvtColor(np.array(source_img[0]), cv2.COLOR_RGB2BGR))
+            num_source_faces = len(source_faces)
+            logging.info(f'Source faces: {num_source_faces}')
+            logging.info(f'Target faces: {num_target_faces}')
+
+            if source_faces is None:
+                raise Exception('No source faces found!')
+
+            if target_indexes == "-1":
+                if num_source_faces == 1:
+                    logging.info('Replacing all faces in target image with the same face from the source image')
+                    num_iterations = num_target_faces
+                elif num_source_faces < num_target_faces:
+                    logging.info('There are less faces in the source image than the target image, replacing as many as we can')
+                    num_iterations = num_source_faces
+                elif num_target_faces < num_source_faces:
+                    logging.info('There are less faces in the target image than the source image, replacing as many as we can')
+                    num_iterations = num_target_faces
+                else:
+                    logging.info('Replacing all faces in the target image with the faces from the source image')
+                    num_iterations = num_target_faces
+
+                for i in range(num_iterations):
+                    source_index = 0 if num_source_faces == 1 else i
+                    target_index = i
+
+                    temp_frame = swap_face(
+                        face_swapper,
+                        source_faces,
+                        target_faces,
+                        source_index,
+                        target_index,
+                        temp_frame
+                    )
+            elif source_indexes == '-1' and target_indexes == '-1':
+                logging.info('Replacing specific face(s) in the target image with the face from the source image')
+                target_indexes = target_indexes.split(',')
+                source_index = 0
+
+                for target_index in target_indexes:
+                    target_index = int(target_index)
+
+                    temp_frame = swap_face(
+                        face_swapper,
+                        source_faces,
+                        target_faces,
+                        source_index,
+                        target_index,
+                        temp_frame
+                    )
+            else:
+                logging.info('Replacing specific face(s) in the target image with specific face(s) from the source image')
+
+                if source_indexes == "-1":
+                    source_indexes = ','.join(map(lambda x: str(x), range(num_source_faces)))
+
+                if target_indexes == "-1":
+                    target_indexes = ','.join(map(lambda x: str(x), range(num_target_faces)))
+
+                source_indexes = source_indexes.split(',')
+                target_indexes = target_indexes.split(',')
+                num_source_faces_to_swap = len(source_indexes)
+                num_target_faces_to_swap = len(target_indexes)
+
+                if num_source_faces_to_swap > num_source_faces:
+                    raise Exception('Number of source indexes is greater than the number of faces in the source image')
+
+                if num_target_faces_to_swap > num_target_faces:
+                    raise Exception('Number of target indexes is greater than the number of faces in the target image')
+
+                if num_source_faces_to_swap > num_target_faces_to_swap:
+                    num_iterations = num_source_faces_to_swap
+                else:
+                    num_iterations = num_target_faces_to_swap
+
+                if num_source_faces_to_swap == num_target_faces_to_swap:
+                    for index in range(num_iterations):
+                        source_index = int(source_indexes[index])
+                        target_index = int(target_indexes[index])
+
+                        if source_index > num_source_faces-1:
+                            raise ValueError(f'Source index {source_index} is higher than the number of faces in the source image')
+
+                        if target_index > num_target_faces-1:
+                            raise ValueError(f'Target index {target_index} is higher than the number of faces in the target image')
+
+                        temp_frame = swap_face(
+                            face_swapper,
+                            source_faces,
+                            target_faces,
+                            source_index,
+                            target_index,
+                            temp_frame
+                        )
         else:
-            # replace all faces in target image to same source_face
-            source_img = cv2.cvtColor(np.array(source_img), cv2.COLOR_RGB2BGR)
-            source_face = get_one_face(face_analyser, source_img)
-            if source_face is None:
-                raise Exception("No source face found!")
-            for target_face in target_faces:
-                temp_frame = swap_face(face_swapper, source_face, target_face, temp_frame)
+            logging.error('Unsupported face configuration')
+            raise Exception('Unsupported face configuration')
         result = temp_frame
     else:
-        print("No target faces found!")
+        logging.error('No target faces found')
+        raise Exception('No target faces found!')
 
     result_image = Image.fromarray(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
     return result_image
 
 
-def face_swap(src_img_path, target_img_path):
+def face_swap(src_img_path,
+              target_img_path,
+              source_indexes,
+              target_indexes,
+              background_enhance,
+              face_restore,
+              face_upsample,
+              upscale,
+              codeformer_fidelity,
+              output_format):
+
     source_img_paths = src_img_path.split(';')
     source_img = [Image.open(img_path) for img_path in source_img_paths]
     target_img = Image.open(target_img_path)
 
-    # download from https://huggingface.co/deepinsight/inswapper/tree/main
+    # download from https://huggingface.co/ashleykleynhans/inswapper/tree/main
     model = os.path.join(script_dir, 'checkpoints/inswapper_128.onnx')
-    result_image = process(source_img, target_img, model)
+    logging.info(f'Face swap mode: {model}')
+
+    try:
+        logging.info('Performing face swap')
+        result_image = process(
+            source_img,
+            target_img,
+            source_indexes,
+            target_indexes,
+            model
+        )
+        logging.info('Face swap complete')
+    except Exception as e:
+        raise
 
     # make sure the ckpts downloaded successfully
     check_ckpts()
 
-    # https://huggingface.co/spaces/sczhou/CodeFormer
-    upsampler = set_realesrgan()
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if face_restore:
+        # https://huggingface.co/spaces/sczhou/CodeFormer
+        logging.info('Setting upsampler to RealESRGAN_x2plus')
+        upsampler = set_realesrgan()
 
-    codeformer_net = ARCH_REGISTRY.get('CodeFormer')(
-        dim_embd=512,
-        codebook_size=1024,
-        n_head=8,
-        n_layers=9,
-        connect_list=['32', '64', '128', '256'],
-    ).to(device)
+        if torch.cuda.is_available():
+            torch_device = 'cuda'
+        else:
+            torch_device = 'cpu'
 
-    ckpt_path = os.path.join(script_dir, 'CodeFormer/CodeFormer/weights/CodeFormer/codeformer.pth')
-    checkpoint = torch.load(ckpt_path)['params_ema']
-    codeformer_net.load_state_dict(checkpoint)
-    codeformer_net.eval()
-    result_image = cv2.cvtColor(np.array(result_image), cv2.COLOR_RGB2BGR)
+        logging.info(f'Torch device: {torch_device.upper()}')
+        device = torch.device(torch_device)
 
-    background_enhance = True
-    face_upsample = True
-    upscale = 1
-    codeformer_fidelity = 0.5
+        codeformer_net = ARCH_REGISTRY.get('CodeFormer')(
+            dim_embd=512,
+            codebook_size=1024,
+            n_head=8,
+            n_layers=9,
+            connect_list=['32', '64', '128', '256'],
+        ).to(device)
 
-    result_image = face_restoration(
-        result_image,
-        background_enhance,
-        face_upsample,
-        upscale,
-        codeformer_fidelity,
-        upsampler,
-        codeformer_net,
-        device
-    )
+        ckpt_path = os.path.join(script_dir, 'CodeFormer/CodeFormer/weights/CodeFormer/codeformer.pth')
+        logging.info(f'Loading CodeFormer model: {ckpt_path}')
+        checkpoint = torch.load(ckpt_path)['params_ema']
+        codeformer_net.load_state_dict(checkpoint)
+        codeformer_net.eval()
+        result_image = cv2.cvtColor(np.array(result_image), cv2.COLOR_RGB2BGR)
+        logging.info('Performing face restoration using CodeFormer')
 
-    result_image = Image.fromarray(result_image)
+        try:
+            result_image = face_restoration(
+                result_image,
+                background_enhance,
+                face_upsample,
+                upscale,
+                codeformer_fidelity,
+                upsampler,
+                codeformer_net,
+                device
+            )
+        except Exception as e:
+            raise
+
+        logging.info('CodeFormer face restoration completed successfully')
+        result_image = Image.fromarray(result_image)
+
     output_buffer = io.BytesIO()
-    result_image.save(output_buffer, format='JPEG')
+    result_image.save(output_buffer, format=output_format)
     image_data = output_buffer.getvalue()
 
     return base64.b64encode(image_data).decode('utf-8')
@@ -312,35 +447,50 @@ def face_swap_api():
         logging.info(f'Creating temporary directory: {TMP_PATH}')
         os.makedirs(TMP_PATH)
 
-    # Get the source image file
-    source_file_b64 = payload['source_image']
-    source_unique_id = uuid.uuid4()
-    source_file_extension = determine_file_extension(source_file_b64)
-    source_image_path = f'{TMP_PATH}/{source_unique_id}{source_file_extension}'
-    logging.info(f'Saving face swap source image to disk: {source_image_path}')
-    write_base64_to_disk(source_file_b64, source_image_path)
-    logging.info(f'Successfully saved face swap source image: {source_image_path}')
+    unique_id = uuid.uuid4()
+    source_image_data = input['source_image']
+    target_image_data = input['target_image']
 
-    # Get the target image file
-    target_file_b64 = payload['target_image']
-    target_unique_id = uuid.uuid4()
-    target_file_extension = determine_file_extension(target_file_b64)
-    target_image_path = f'{TMP_PATH}/{target_unique_id}{target_file_extension}'
-    logging.info(f'Saving face swap target image to disk: {target_image_path}')
-    write_base64_to_disk(target_file_b64, target_image_path)
-    logging.info(f'Successfully saved face swap target image: {target_image_path}')
+    # Decode the source image data
+    source_image = base64.b64decode(source_image_data)
+    source_file_extension = determine_file_extension(source_image_data)
+    source_image_path = f'{TMP_PATH}/source_{unique_id}{source_file_extension}'
+
+    # Save the source image to disk
+    with open(source_image_path, 'wb') as source_file:
+        source_file.write(source_image)
+
+    # Decode the target image data
+    target_image = base64.b64decode(target_image_data)
+    target_file_extension = determine_file_extension(target_image_data)
+    target_image_path = f'{TMP_PATH}/target_{unique_id}{target_file_extension}'
+
+    # Save the target image to disk
+    with open(target_image_path, 'wb') as target_file:
+        target_file.write(target_image)
 
     try:
-        # Submit the request to the executor
-        future = executor.submit(process_request, {
-            'source_image': source_image_path,
-            'target_image': target_image_path
-        })
+        logging.info(f'Source indexes: {input["source_indexes"]}')
+        logging.info(f'Target indexes: {input["target_indexes"]}')
+        logging.info(f'Background enhance: {input["background_enhance"]}')
+        logging.info(f'Face Restoration: {input["face_restore"]}')
+        logging.info(f'Face Upsampling: {input["face_upsample"]}')
+        logging.info(f'Upscale: {input["upscale"]}')
+        logging.info(f'Codeformer Fidelity: {input["codeformer_fidelity"]}')
+        logging.info(f'Output Format: {input["output_format"]}')
 
-        # Wait for the request to be processed
-        response = future.result()
-        status_code = 200
-
+        result_image = face_swap(
+            source_image_path,
+            target_image_path,
+            input['source_indexes'],
+            input['target_indexes'],
+            input['background_enhance'],
+            input['face_restore'],
+            input['face_upsample'],
+            input['upscale'],
+            input['codeformer_fidelity'],
+            input['output_format']
+        )
     except Exception as e:
         logging.error(e)
         response = {
@@ -351,11 +501,13 @@ def face_swap_api():
         status_code = 500
 
     # Clean up temporary images
-    logging.debug('Face swap image created successfully')
-    logging.debug(f'Deleting temporary source face swap image: {source_image_path}')
     os.remove(source_image_path)
-    logging.debug(f'Deleting temporary target face swap image: {target_image_path}')
     os.remove(target_image_path)
+
+    response = {
+        'status': 'ok',
+        'image': result_image
+    }
 
     total_time = total_timer.get_elapsed_time()
     logging.info(f'Total time taken for face swap API call {total_time} seconds')
