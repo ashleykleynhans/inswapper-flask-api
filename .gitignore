@@ -6,3 +6,4 @@ venv/*
 .DS_Store
 checkpoints
 CodeFormer
+__pycache__

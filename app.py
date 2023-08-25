@@ -15,9 +15,7 @@ from typing import List, Union
 from PIL import Image
 from restoration import *
 from flask import Flask, request, jsonify, make_response
-from concurrent.futures import ThreadPoolExecutor
 
-MAX_WORKERS = 10
 LOG_LEVEL = logging.INFO
 TMP_PATH = '/tmp/inswapper'
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -80,7 +78,7 @@ def get_args():
         '-p', '--port',
         help='Port to listen on',
         type=int,
-        default=5000
+        default=8090
     )
 
     parser.add_argument(
@@ -448,8 +446,8 @@ def face_swap_api():
         os.makedirs(TMP_PATH)
 
     unique_id = uuid.uuid4()
-    source_image_data = input['source_image']
-    target_image_data = input['target_image']
+    source_image_data = payload['source_image']
+    target_image_data = payload['target_image']
 
     # Decode the source image data
     source_image = base64.b64decode(source_image_data)
@@ -469,28 +467,58 @@ def face_swap_api():
     with open(target_image_path, 'wb') as target_file:
         target_file.write(target_image)
 
+    # Set defaults if they are not specified in the payload
+    if 'source_indexes' not in payload:
+        payload['source_indexes'] = '-1'
+
+    if 'target_indexes' not in payload:
+        payload['target_indexes'] = '-1'
+
+    if 'background_enhance' not in payload:
+        payload['background_enhance'] = True
+
+    if 'face_restore' not in payload:
+        payload['face_restore'] = True
+
+    if 'face_upsample' not in payload:
+        payload['face_upsample'] = True
+
+    if 'upscale' not in payload:
+        payload['upscale'] = 1
+
+    if 'codeformer_fidelity' not in payload:
+        payload['codeformer_fidelity'] = 0.5
+
+    if 'output_format' not in payload:
+        payload['output_format'] = 'JPEG'
+
     try:
-        logging.info(f'Source indexes: {input["source_indexes"]}')
-        logging.info(f'Target indexes: {input["target_indexes"]}')
-        logging.info(f'Background enhance: {input["background_enhance"]}')
-        logging.info(f'Face Restoration: {input["face_restore"]}')
-        logging.info(f'Face Upsampling: {input["face_upsample"]}')
-        logging.info(f'Upscale: {input["upscale"]}')
-        logging.info(f'Codeformer Fidelity: {input["codeformer_fidelity"]}')
-        logging.info(f'Output Format: {input["output_format"]}')
+        logging.info(f'Source indexes: {payload["source_indexes"]}')
+        logging.info(f'Target indexes: {payload["target_indexes"]}')
+        logging.info(f'Background enhance: {payload["background_enhance"]}')
+        logging.info(f'Face Restoration: {payload["face_restore"]}')
+        logging.info(f'Face Upsampling: {payload["face_upsample"]}')
+        logging.info(f'Upscale: {payload["upscale"]}')
+        logging.info(f'Codeformer Fidelity: {payload["codeformer_fidelity"]}')
+        logging.info(f'Output Format: {payload["output_format"]}')
 
         result_image = face_swap(
             source_image_path,
             target_image_path,
-            input['source_indexes'],
-            input['target_indexes'],
-            input['background_enhance'],
-            input['face_restore'],
-            input['face_upsample'],
-            input['upscale'],
-            input['codeformer_fidelity'],
-            input['output_format']
+            payload['source_indexes'],
+            payload['target_indexes'],
+            payload['background_enhance'],
+            payload['face_restore'],
+            payload['face_upsample'],
+            payload['upscale'],
+            payload['codeformer_fidelity'],
+            payload['output_format']
         )
+
+        response = {
+            'status': 'ok',
+            'image': result_image
+        }
     except Exception as e:
         logging.error(e)
         response = {
@@ -503,11 +531,6 @@ def face_swap_api():
     # Clean up temporary images
     os.remove(source_image_path)
     os.remove(target_image_path)
-
-    response = {
-        'status': 'ok',
-        'image': result_image
-    }
 
     total_time = total_timer.get_elapsed_time()
     logging.info(f'Total time taken for face swap API call {total_time} seconds')
