@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 import sys
 import os
 import io
@@ -16,7 +17,7 @@ from PIL import Image
 from restoration import *
 from flask import Flask, request, jsonify, make_response
 
-LOG_LEVEL = logging.INFO
+LOG_LEVEL = logging.DEBUG
 TMP_PATH = '/tmp/inswapper'
 script_dir = os.path.dirname(os.path.abspath(__file__))
 log_path = ''
@@ -177,7 +178,7 @@ def process(source_img: Union[Image.Image, List],
     if target_faces is not None:
         temp_frame = copy.deepcopy(target_img)
         if isinstance(source_img, list) and num_source_images == num_target_faces:
-            logging.info('Replacing the faces in the target image from left to right by order')
+            logging.debug('Replacing the faces in the target image from left to right by order')
             for i in range(num_target_faces):
                 source_faces = get_many_faces(face_analyser, cv2.cvtColor(np.array(source_img[i]), cv2.COLOR_RGB2BGR))
                 source_index = i
@@ -198,24 +199,24 @@ def process(source_img: Union[Image.Image, List],
             # detect source faces that will be replaced into the target image
             source_faces = get_many_faces(face_analyser, cv2.cvtColor(np.array(source_img[0]), cv2.COLOR_RGB2BGR))
             num_source_faces = len(source_faces)
-            logging.info(f'Source faces: {num_source_faces}')
-            logging.info(f'Target faces: {num_target_faces}')
+            logging.debug(f'Source faces: {num_source_faces}')
+            logging.debug(f'Target faces: {num_target_faces}')
 
             if source_faces is None:
                 raise Exception('No source faces found!')
 
             if target_indexes == "-1":
                 if num_source_faces == 1:
-                    logging.info('Replacing all faces in target image with the same face from the source image')
+                    logging.debug('Replacing all faces in target image with the same face from the source image')
                     num_iterations = num_target_faces
                 elif num_source_faces < num_target_faces:
-                    logging.info('There are less faces in the source image than the target image, replacing as many as we can')
+                    logging.debug('There are less faces in the source image than the target image, replacing as many as we can')
                     num_iterations = num_source_faces
                 elif num_target_faces < num_source_faces:
-                    logging.info('There are less faces in the target image than the source image, replacing as many as we can')
+                    logging.debug('There are less faces in the target image than the source image, replacing as many as we can')
                     num_iterations = num_target_faces
                 else:
-                    logging.info('Replacing all faces in the target image with the faces from the source image')
+                    logging.debug('Replacing all faces in the target image with the faces from the source image')
                     num_iterations = num_target_faces
 
                 for i in range(num_iterations):
@@ -231,7 +232,7 @@ def process(source_img: Union[Image.Image, List],
                         temp_frame
                     )
             elif source_indexes == '-1' and target_indexes == '-1':
-                logging.info('Replacing specific face(s) in the target image with the face from the source image')
+                logging.debug('Replacing specific face(s) in the target image with the face from the source image')
                 target_indexes = target_indexes.split(',')
                 source_index = 0
 
@@ -247,7 +248,7 @@ def process(source_img: Union[Image.Image, List],
                         temp_frame
                     )
             else:
-                logging.info('Replacing specific face(s) in the target image with specific face(s) from the source image')
+                logging.debug('Replacing specific face(s) in the target image with specific face(s) from the source image')
 
                 if source_indexes == "-1":
                     source_indexes = ','.join(map(lambda x: str(x), range(num_source_faces)))
@@ -319,10 +320,10 @@ def face_swap(src_img_path,
 
     # download from https://huggingface.co/ashleykleynhans/inswapper/tree/main
     model = os.path.join(script_dir, 'checkpoints/inswapper_128.onnx')
-    logging.info(f'Face swap mode: {model}')
+    logging.debug(f'Face swap model: {model}')
 
     try:
-        logging.info('Performing face swap')
+        logging.debug('Performing face swap')
         result_image = process(
             source_img,
             target_img,
@@ -330,7 +331,7 @@ def face_swap(src_img_path,
             target_indexes,
             model
         )
-        logging.info('Face swap complete')
+        logging.debug('Face swap complete')
     except Exception as e:
         raise
 
@@ -339,7 +340,7 @@ def face_swap(src_img_path,
 
     if face_restore:
         # https://huggingface.co/spaces/sczhou/CodeFormer
-        logging.info('Setting upsampler to RealESRGAN_x2plus')
+        logging.debug('Setting upsampler to RealESRGAN_x2plus')
         upsampler = set_realesrgan()
 
         if torch.cuda.is_available():
@@ -347,7 +348,7 @@ def face_swap(src_img_path,
         else:
             torch_device = 'cpu'
 
-        logging.info(f'Torch device: {torch_device.upper()}')
+        logging.debug(f'Torch device: {torch_device.upper()}')
         device = torch.device(torch_device)
 
         codeformer_net = ARCH_REGISTRY.get('CodeFormer')(
@@ -359,12 +360,12 @@ def face_swap(src_img_path,
         ).to(device)
 
         ckpt_path = os.path.join(script_dir, 'CodeFormer/CodeFormer/weights/CodeFormer/codeformer.pth')
-        logging.info(f'Loading CodeFormer model: {ckpt_path}')
+        logging.debug(f'Loading CodeFormer model: {ckpt_path}')
         checkpoint = torch.load(ckpt_path)['params_ema']
         codeformer_net.load_state_dict(checkpoint)
         codeformer_net.eval()
         result_image = cv2.cvtColor(np.array(result_image), cv2.COLOR_RGB2BGR)
-        logging.info('Performing face restoration using CodeFormer')
+        logging.debug('Performing face restoration using CodeFormer')
 
         try:
             result_image = face_restoration(
@@ -380,7 +381,7 @@ def face_swap(src_img_path,
         except Exception as e:
             raise
 
-        logging.info('CodeFormer face restoration completed successfully')
+        logging.debug('CodeFormer face restoration completed successfully')
         result_image = Image.fromarray(result_image)
 
     output_buffer = io.BytesIO()
@@ -438,11 +439,11 @@ def ping():
 @app.route('/faceswap', methods=['POST'])
 def face_swap_api():
     total_timer = Timer()
-    logging.info('Received face swap API request')
+    logging.debug('Received face swap API request')
     payload = request.get_json()
 
     if not os.path.exists(TMP_PATH):
-        logging.info(f'Creating temporary directory: {TMP_PATH}')
+        logging.debug(f'Creating temporary directory: {TMP_PATH}')
         os.makedirs(TMP_PATH)
 
     unique_id = uuid.uuid4()
@@ -492,15 +493,17 @@ def face_swap_api():
     if 'output_format' not in payload:
         payload['output_format'] = 'JPEG'
 
+    print(json.dumps(payload, indent=4, default=str))
+
     try:
-        logging.info(f'Source indexes: {payload["source_indexes"]}')
-        logging.info(f'Target indexes: {payload["target_indexes"]}')
-        logging.info(f'Background enhance: {payload["background_enhance"]}')
-        logging.info(f'Face Restoration: {payload["face_restore"]}')
-        logging.info(f'Face Upsampling: {payload["face_upsample"]}')
-        logging.info(f'Upscale: {payload["upscale"]}')
-        logging.info(f'Codeformer Fidelity: {payload["codeformer_fidelity"]}')
-        logging.info(f'Output Format: {payload["output_format"]}')
+        logging.debug(f'Source indexes: {payload["source_indexes"]}')
+        logging.debug(f'Target indexes: {payload["target_indexes"]}')
+        logging.debug(f'Background enhance: {payload["background_enhance"]}')
+        logging.debug(f'Face Restoration: {payload["face_restore"]}')
+        logging.debug(f'Face Upsampling: {payload["face_upsample"]}')
+        logging.debug(f'Upscale: {payload["upscale"]}')
+        logging.debug(f'Codeformer Fidelity: {payload["codeformer_fidelity"]}')
+        logging.debug(f'Output Format: {payload["output_format"]}')
 
         result_image = face_swap(
             source_image_path,
