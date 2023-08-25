@@ -33,7 +33,7 @@ pip3 install -r requirements.txt
 ## Download Checkpoints
 
 You will need to download the [face swap model](
-https://huggingface.co/deepinsight/inswapper/resolve/main/inswapper_128.onnx) and
+https://huggingface.co/ashleykleynhans/inswapper/resolve/main/inswapper_128.onnx) and
 save it under `./checkpoints`.
 
 ```bash
@@ -82,9 +82,8 @@ Get a [RunPod](https://runpod.io?ref=w18gds2n) account.
 
 ## Acknowledgements
 
-1. This project is inspired by [inswapper](https://huggingface.co/deepinsight/inswapper/tree/main).
-2. Thanks [insightface.ai](https://insightface.ai/) for releasing their powerful swap model that made this possible.
-3. This codebase is built on top of [inswapper](https://github.com/haofanwang/inswapper) and [CodeFormer](
+1. Thanks [insightface.ai](https://insightface.ai/) for releasing their powerful swap model that made this possible.
+2. This codebase is built on top of [inswapper](https://github.com/haofanwang/inswapper) and [CodeFormer](
    https://huggingface.co/spaces/sczhou/CodeFormer).
-4. [inswapper](https://github.com/haofanwang/inswapper) is built on the top of [sd-webui-roop](
+3. [inswapper](https://github.com/haofanwang/inswapper) is built on the top of [sd-webui-roop](
    https://github.com/s0md3v/sd-webui-roop) and [CodeFormer](https://huggingface.co/spaces/sczhou/CodeFormer).
