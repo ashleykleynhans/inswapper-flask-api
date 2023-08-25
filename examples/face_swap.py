@@ -8,15 +8,21 @@ from PIL import Image
 
 URL = 'http://127.0.0.1:8090/faceswap'
 
-SOURCE_IMAGE = '/Users/ashley/src/inswapper/data/src.jpg'
-TARGET_IMAGE = '/Users/ashley/src/inswapper/data/target.jpg'
+SOURCE_IMAGE = '../data/src.jpg'
+TARGET_IMAGE = '../data/target.jpg'
+SOURCE_INDEXES = '-1'
+TARGET_INDEXES = '-1'
+BACKGROUND_ENHANCE = True
+FACE_RESTORE = True
+FACE_UPSAMPLE = True
+UPSCALE = 1
+CODEFORMER_FIDELITY = 0.5
+OUTPUT_FORMAT = 'JPEG'
 
 
 def encode_image_to_base64(image_path):
     with open(image_path, 'rb') as image_file:
-        image_data = image_file.read()
-        encoded_data = base64.b64encode(image_data).decode('utf-8')
-        return encoded_data
+        return base64.b64encode(image_file.read()).decode('utf-8')
 
 
 def save_result_image(resp_json):
@@ -30,8 +36,16 @@ def save_result_image(resp_json):
 
 if __name__ == '__main__':
     payload = {
-        'source_image': encode_image_to_base64(SOURCE_IMAGE),
-        'target_image': encode_image_to_base64(TARGET_IMAGE)
+        "source_image": encode_image_to_base64(SOURCE_IMAGE),
+        "target_image": encode_image_to_base64(TARGET_IMAGE),
+        "source_indexes": SOURCE_INDEXES,
+        "target_indexes": TARGET_INDEXES,
+        "background_enhance": BACKGROUND_ENHANCE,
+        "face_restore": FACE_RESTORE,
+        "face_upsample": FACE_UPSAMPLE,
+        "upscale": UPSCALE,
+        "codeformer_fidelity": CODEFORMER_FIDELITY,
+        "output_format": OUTPUT_FORMAT
     }
 
     r = requests.post(

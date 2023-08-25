@@ -145,12 +145,17 @@ def get_many_faces(face_analyser,
 
 
 def swap_face(face_swapper,
-              source_face,
-              target_face,
+              source_faces,
+              target_faces,
+              source_index,
+              target_index,
               temp_frame):
     """
     paste source_face on target image
     """
+    source_face = source_faces[source_index]
+    target_face = target_faces[target_index]
+
     return face_swapper.get(temp_frame, target_face, source_face, paste_back=True)
 
 
@@ -168,12 +173,12 @@ def process(source_img: Union[Image.Image, List],
     face_swapper = get_face_swap_model(model_path)
 
     # read target image
-    target_faces = get_many_faces(face_analyser, target_img)
-    num_target_faces = len(target_faces)
-    num_source_images = len(source_img)
+    target_img = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
 
     # detect faces that will be replaced in target_img
     target_faces = get_many_faces(face_analyser, target_img)
+    num_target_faces = len(target_faces)
+    num_source_images = len(source_img)
 
     if target_faces is not None:
         temp_frame = copy.deepcopy(target_img)
@@ -518,17 +523,21 @@ def face_swap_api():
             payload['output_format']
         )
 
+        status_code = 200
+
         response = {
             'status': 'ok',
             'image': result_image
         }
     except Exception as e:
         logging.error(e)
+
         response = {
             'status': 'error',
             'msg': 'Face swap failed',
             'detail': str(e)
         }
+
         status_code = 500
 
     # Clean up temporary images
