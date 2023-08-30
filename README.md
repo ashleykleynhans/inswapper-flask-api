@@ -38,7 +38,7 @@ save it under `./checkpoints`.
 
 ```bash
 mkdir checkpoints
-wget -O ./checkpoints/inswapper_128.onnx https://huggingface.co/deepinsight/inswapper/resolve/main/inswapper_128.onnx 
+wget -O ./checkpoints/inswapper_128.onnx https://huggingface.co/ashleykleynhans/inswapper/resolve/main/inswapper_128.onnx
 ```
 
 ## Face Restoration
