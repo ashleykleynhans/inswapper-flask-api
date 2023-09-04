@@ -16,6 +16,7 @@ from typing import List, Union
 from PIL import Image
 from restoration import *
 from flask import Flask, request, jsonify, make_response
+from waitress import serve
 
 LOG_LEVEL = logging.DEBUG
 TMP_PATH = '/tmp/inswapper'
@@ -553,7 +554,8 @@ def face_swap_api():
 if __name__ == '__main__':
     args = get_args()
 
-    app.run(
+    serve(
+        app,
         host=args.host,
         port=args.port
     )

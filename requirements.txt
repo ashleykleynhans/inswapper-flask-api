@@ -18,3 +18,4 @@ torch
 torchvision
 tqdm
 yapf
+waitress
