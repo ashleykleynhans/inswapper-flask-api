@@ -499,8 +499,6 @@ def face_swap_api():
     if 'output_format' not in payload:
         payload['output_format'] = 'JPEG'
 
-    print(json.dumps(payload, indent=4, default=str))
-
     try:
         logging.debug(f'Source indexes: {payload["source_indexes"]}')
         logging.debug(f'Target indexes: {payload["target_indexes"]}')

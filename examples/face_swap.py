@@ -6,7 +6,7 @@ import requests
 import base64
 from PIL import Image
 
-URL = 'http://127.0.0.1:8090/faceswap'
+URL = 'http://127.0.0.1:5000/faceswap'
 
 SOURCE_IMAGE = '../data/src.jpg'
 TARGET_IMAGE = '../data/target.jpg'
