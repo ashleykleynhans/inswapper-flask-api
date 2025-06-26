@@ -78,7 +78,7 @@ with CodeFormer Face Restoration enabled.
 | Ubuntu 22.04 LTS on an A5000 RunPod GPU pod | 14.2 seconds  |
 | Windows 10                                  | 103.9 seconds |
 
-Get a [RunPod](https://runpod.io?ref=w18gds2n) account.
+Get a [RunPod](https://runpod.io?ref=2xxro4sy) account.
 
 ## Acknowledgements
 
