@@ -1,0 +1,249 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - 'docker-bake.hcl'
+      - 'scripts/**'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          python -m pytest tests/ -v --cov=app --cov-report=term-missing
+
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.extract.outputs.release }}
+      app: ${{ steps.extract.outputs.app }}
+      registry_user: ${{ steps.extract.outputs.registry_user }}
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Extract variables from docker-bake.hcl
+        id: extract
+        run: |
+          RELEASE=$(grep 'variable "RELEASE"' -A 2 docker-bake.hcl | grep 'default' | sed 's/.*"\(.*\)"/\1/')
+          APP=$(grep 'variable "APP"' -A 2 docker-bake.hcl | grep 'default' | sed 's/.*"\(.*\)"/\1/')
+          REGISTRY_USER=$(grep 'variable "REGISTRY_USER"' -A 2 docker-bake.hcl | grep 'default' | sed 's/.*"\(.*\)"/\1/')
+
+          echo "release=${RELEASE}" >> $GITHUB_OUTPUT
+          echo "app=${APP}" >> $GITHUB_OUTPUT
+          echo "registry_user=${REGISTRY_USER}" >> $GITHUB_OUTPUT
+
+          echo "Current RELEASE: ${RELEASE}"
+          echo "Current APP: ${APP}"
+          echo "Current REGISTRY_USER: ${REGISTRY_USER}"
+
+      - name: Check if RELEASE changed
+        id: check
+        run: |
+          # For manual triggers, always build
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "Manual trigger - will build"
+            exit 0
+          fi
+
+          # Check if docker-bake.hcl was modified
+          if ! git diff HEAD^ HEAD --name-only | grep -q "docker-bake.hcl"; then
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "docker-bake.hcl not modified - skipping build"
+            exit 0
+          fi
+
+          # Get RELEASE value from current commit
+          CURRENT_RELEASE=$(grep 'variable "RELEASE"' -A 2 docker-bake.hcl | grep 'default' | sed 's/.*"\(.*\)"/\1/')
+
+          # Get RELEASE value from previous commit
+          git show HEAD^:docker-bake.hcl > /tmp/docker-bake-prev.hcl
+          PREV_RELEASE=$(grep 'variable "RELEASE"' -A 2 /tmp/docker-bake-prev.hcl | grep 'default' | sed 's/.*"\(.*\)"/\1/')
+
+          echo "Previous RELEASE: ${PREV_RELEASE}"
+          echo "Current RELEASE: ${CURRENT_RELEASE}"
+
+          # Compare RELEASE values
+          if [ "${PREV_RELEASE}" != "${CURRENT_RELEASE}" ]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "RELEASE changed from '${PREV_RELEASE}' to '${CURRENT_RELEASE}' - will build"
+          else
+            # Also check for any other relevant changes (APP, REGISTRY_USER, or structural changes)
+            if git diff HEAD^ HEAD docker-bake.hcl | grep -E '^\+|^\-' | grep -v '^+++\|^---' | grep -q .; then
+              echo "should_build=true" >> $GITHUB_OUTPUT
+              echo "Other changes detected in docker-bake.hcl - will build"
+            else
+              echo "should_build=false" >> $GITHUB_OUTPUT
+              echo "No significant changes detected - skipping build"
+            fi
+          fi
+
+  build-and-push:
+    needs: [detect-changes, test]
+    if: needs.detect-changes.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    outputs:
+      images: ${{ steps.list-images.outputs.images }}
+      images_json: ${{ steps.list-images.outputs.images_json }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Free up disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -rf /swapfile /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo apt-get purge -y '^dotnet-.*' '^llvm-.*' 'php.*' azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox powershell mono-devel 2>/dev/null || true
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+          buildkitd-flags: --debug
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create temporary docker-bake override file
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          OWNER_LC=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          cat > docker-bake.override.hcl << EOF
+          target "default" {
+            inherits = ["default"]
+            tags = ["ghcr.io/${OWNER_LC}/${{ needs.detect-changes.outputs.app }}:${{ needs.detect-changes.outputs.release }}"]
+          }
+          EOF
+
+          echo "Override file created:"
+          cat docker-bake.override.hcl
+
+      - name: Build and push Docker image
+        run: |
+          echo "Building and pushing Docker image to ghcr.io with provenance and SBOM attestations..."
+
+          echo "Configuration:"
+          docker buildx bake -f docker-bake.hcl -f docker-bake.override.hcl --print default
+
+          echo ""
+          echo "Starting build..."
+
+          docker buildx bake -f docker-bake.hcl -f docker-bake.override.hcl --push default
+
+          echo "Build completed!"
+
+      - name: Verify image was pushed
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          OWNER_LC=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${OWNER_LC}/${{ needs.detect-changes.outputs.app }}:${{ needs.detect-changes.outputs.release }}"
+          echo "Verifying image: $IMAGE"
+
+          docker buildx imagetools inspect $IMAGE && echo "✅ SUCCESS: Image verified: $IMAGE" || echo "❌ FAILED: Could not find image: $IMAGE"
+
+      - name: List built image
+        id: list-images
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          RELEASE="${{ needs.detect-changes.outputs.release }}"
+          APP="${{ needs.detect-changes.outputs.app }}"
+          REGISTRY="ghcr.io"
+          REGISTRY_USER=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+
+          IMAGE="${REGISTRY}/${REGISTRY_USER}/${APP}:${RELEASE}"
+          IMAGES_JSON=$(echo "[\"${IMAGE}\"]" | jq -c '.')
+
+          echo "images<<EOF" >> $GITHUB_OUTPUT
+          echo "$IMAGE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "images_json=${IMAGES_JSON}" >> $GITHUB_OUTPUT
+
+          echo "$IMAGE" > built-images.txt
+          echo "$IMAGES_JSON" > built-images.json
+
+      - name: Upload image list artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: docker-images-list
+          path: |
+            built-images.txt
+            built-images.json
+          retention-days: 90
+
+      - name: Display built image
+        run: |
+          echo "Successfully built and pushed the following image:"
+          cat built-images.txt
+          echo ""
+          echo "JSON format:"
+          cat built-images.json
+
+  create-summary:
+    needs: [detect-changes, build-and-push]
+    if: needs.detect-changes.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create job summary
+        run: |
+          echo "## Docker Image Built" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Application:** ${{ needs.detect-changes.outputs.app }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Release:** ${{ needs.detect-changes.outputs.release }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Image Pushed to GitHub Container Registry:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ needs.build-and-push.outputs.images }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### To pull this image:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ needs.build-and-push.outputs.images }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** If the image is private, make it public at:" >> $GITHUB_STEP_SUMMARY
+          echo "https://github.com/${{ github.repository_owner }}?tab=packages" >> $GITHUB_STEP_SUMMARY
