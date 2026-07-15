@@ -95,7 +95,8 @@ class _SwapperModel:
 def _load_embedding_converter(name: str) -> onnxruntime.InferenceSession:
     """Load (or retrieve cached) embedding converter ONNX model."""
     if name not in EMBEDDING_CONVERTERS:
-        path = f"checkpoints/face_swapper/{name}"
+        from app.config import FACE_SWAPPER_MODELS_DIR
+        path = os.path.join(str(FACE_SWAPPER_MODELS_DIR), name)
         if not os.path.exists(path):
             raise FileNotFoundError(f"Converter not found: {path}")
         EMBEDDING_CONVERTERS[name] = onnxruntime.InferenceSession(path, None)
@@ -105,7 +106,8 @@ def _load_embedding_converter(name: str) -> onnxruntime.InferenceSession:
 def get_face_swapper_model(model_name: str) -> _SwapperModel:
     """Load (or retrieve cached) face swapper ONNX model."""
     if model_name not in FACE_SWAPPER_MODELS:
-        path = f"checkpoints/face_swapper/{model_name}.onnx"
+        from app.config import FACE_SWAPPER_MODELS_DIR
+        path = os.path.join(str(FACE_SWAPPER_MODELS_DIR), f"{model_name}.onnx")
         logger.info("Loading model: %s", model_name)
         FACE_SWAPPER_MODELS[model_name] = _SwapperModel(path)
     return FACE_SWAPPER_MODELS[model_name]

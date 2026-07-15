@@ -18,7 +18,7 @@ CODEFORMER_CODE_DIR = CODEFORMER_DIR / "CodeFormer"
 TMP_PATH = "/tmp/inswapper"
 
 # Default face swap model (insightface ModelRouter legacy path)
-LEGACY_MODEL_PATH = str(CHECKPOINTS_DIR / "inswapper_128.onnx")
+LEGACY_MODEL_PATH = str(CHECKPOINTS_DIR / "face_swapper" / "inswapper_128.onnx")
 
 # ---------------------------------------------------------------------------
 # Default parameter values
