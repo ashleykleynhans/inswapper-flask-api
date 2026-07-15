@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from app.queue.worker import AsyncJobQueue
+from app.job_queue.worker import AsyncJobQueue
 
 
 async def _noop(job_id: str, input_data: dict) -> dict:

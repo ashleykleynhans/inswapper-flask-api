@@ -1,6 +1,6 @@
 """Tests for queue models."""
 
-from app.queue.models import Job, JobStatus
+from app.job_queue.models import Job, JobStatus
 
 
 class TestJobStatus:

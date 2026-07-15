@@ -33,7 +33,7 @@ from app.services.face_swap_service import (
     face_swap,
 )
 from app.services.restoration import check_ckpts, set_realesrgan
-from app.queue.worker import AsyncJobQueue
+from app.job_queue.worker import AsyncJobQueue
 
 logger = logging.getLogger(__name__)
 

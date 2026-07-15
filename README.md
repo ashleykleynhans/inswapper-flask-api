@@ -43,7 +43,7 @@ or rights. The author assumes no liability for any misuse.
 │   │   ├── face_selector.py        # Gender/age filter, 7 sort orders
 │   │   ├── face_swap_service.py    # Orchestration: process + face_swap
 │   │   └── restoration.py          # CodeFormer + RealESRGAN
-│   └── queue/
+│   └── job_queue/
 │       ├── models.py               # Job dataclass, status lifecycle
 │       └── worker.py               # asyncio.Queue + serial worker
 ├── scripts/

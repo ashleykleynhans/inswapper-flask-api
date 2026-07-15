@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Coroutine, Optional
 
 from app.config import JOB_RESULT_TTL_SECONDS, QUEUE_TIMEOUT_SECONDS
-from app.queue.models import Job, JobStatus
+from app.job_queue.models import Job, JobStatus
 
 logger = logging.getLogger(__name__)
 

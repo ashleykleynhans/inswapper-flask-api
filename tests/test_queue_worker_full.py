@@ -5,8 +5,8 @@ from unittest import mock
 
 import pytest
 
-from app.queue.worker import AsyncJobQueue
-from app.queue.models import JobStatus
+from app.job_queue.worker import AsyncJobQueue
+from app.job_queue.models import JobStatus
 
 
 async def _instant(job_id, input_data):
