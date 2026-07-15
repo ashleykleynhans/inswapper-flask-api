@@ -1,6 +1,8 @@
 venv/*
+.venv/*
 .vscode
 .idea
+.coverage
 *.jpg
 *.log
 .DS_Store
