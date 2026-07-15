@@ -12,10 +12,15 @@ import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+# Ensure the project root is on sys.path so `app` is importable when
+# running this file directly (python3 app/main.py).
+_project_root = str(Path(__file__).resolve().parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 import torch
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from basicsr.utils.registry import ARCH_REGISTRY
 
 from app.config import (
     BASE_DIR,
@@ -24,6 +29,12 @@ from app.config import (
     DEFAULT_PORT,
     init_logging,
 )
+
+# Add CodeFormer to sys.path before any basicsr imports
+if str(CODEFORMER_CODE_DIR) not in sys.path:
+    sys.path.insert(0, str(CODEFORMER_CODE_DIR))
+
+from basicsr.utils.registry import ARCH_REGISTRY
 from app.routes.health import router as health_router
 from app.routes.faceswap import router as faceswap_router
 from app.services.face_analyzer import get_face_analyser
@@ -107,11 +118,6 @@ async def lifespan(app: FastAPI):
     # --- Startup ---
     init_logging()
     logger.info("Starting FaceSwap API...")
-
-    # Add CodeFormer to sys.path (needed for basicsr/facelib imports)
-    codeformer_path = str(CODEFORMER_CODE_DIR)
-    if codeformer_path not in sys.path:
-        sys.path.insert(0, codeformer_path)
 
     # Set up torch device
     if torch.cuda.is_available():
