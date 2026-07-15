@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.2] - 2026-07-16
+
+### Fixed
+- Fix ImportError: rename app/queue to app/job_queue to avoid shadowing Python stdlib queue module
+
 ## [2.0.1] - 2026-07-16
 
 ### Changed
