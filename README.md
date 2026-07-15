@@ -5,6 +5,14 @@ CodeFormer restoration, and VRAM-safe serial queue processing.
 
 Powered by [insightface](https://github.com/deepinsight/insightface).
 
+## Disclaimer
+
+This project is intended for educational and research purposes only.
+Users are solely responsible for complying with all applicable laws and
+regulations regarding the use of face swapping technology. Do not use
+this software to create content that violates others' privacy, dignity,
+or rights. The author assumes no liability for any misuse.
+
 ## Features
 
 - **13 face swap models**: inswapper, simswap, ghost, hififace, hyperswap, blendswap, uniface

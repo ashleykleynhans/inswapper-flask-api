@@ -6,6 +6,9 @@
 - Migrated from Flask to FastAPI with uvicorn, async lifespan, and auto-generated OpenAPI docs at `/docs`
 - VRAM-safe async job queue (asyncio.Queue with single serial worker) — processes one request at a time to prevent GPU OOM
 - 13 face swap models: inswapper, simswap, ghost, hififace, hyperswap, blendswap, uniface with per-model metadata
+- docker-bake.hcl with provenance and SBOM attestations
+- GitHub Actions CI workflow: test, detect changes, build and push to ghcr.io
+- Dependabot configuration for pip, Docker, and GitHub Actions
 - Enhanced FaceFusion-based swap pipeline: cv2.estimateAffinePartial2D + RANSAC warp, soft-edge box mask paste-back, 4 source preparation strategies, identity blending
 - Face selector: 7 sort orders (left-right, right-left, top-bottom, small-large, large-small, best-worst, worst-best), gender filter (male/female), age range filter
 - Configurable mask controls: per-edge padding and blur
@@ -16,6 +19,7 @@
 - `pytest.ini` and `.coveragerc` with coverage configured by default
 
 ### Changed
+- License changed from GPL v3 to OpenRAIL-AS (matching FaceFusion)
 - `GET /` health endpoint now returns available models and queue depth
 - `POST /faceswap` returns `202 Accepted` with a job ID (async queue mode)
 - `POST /faceswap/sync` blocks until complete (backward compatible mode)
