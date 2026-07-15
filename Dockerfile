@@ -23,15 +23,15 @@ RUN pip3 install --no-cache-dir -r requirements.txt && \
     pip3 uninstall -y onnxruntime && \
     pip3 install onnxruntime-gpu
 
+# Clone CodeFormer first (download script places weights under CodeFormer/CodeFormer/weights/)
+RUN git lfs install && \
+    git clone https://huggingface.co/spaces/sczhou/CodeFormer
+
 # Download all models (cached layer — only re-runs when download script changes)
 COPY scripts/download_models.py /tmp/
 RUN pip3 install --no-cache-dir tqdm requests && \
     python3 /tmp/download_models.py /app && \
     rm /tmp/download_models.py
-
-# Clone CodeFormer
-RUN git lfs install && \
-    git clone https://huggingface.co/spaces/sczhou/CodeFormer
 
 # Copy application code
 COPY app/ ./app/
