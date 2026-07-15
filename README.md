@@ -247,5 +247,4 @@ Get a [Runpod](https://runpod.io?ref=2xxro4sy) account.
 
 1. [FaceFusion](https://github.com/facefusion/facefusion) for the enhanced swap pipeline.
 2. [insightface.ai](https://insightface.ai/) for their powerful face detection and swap models.
-3. This codebase is built on top of [inswapper](https://github.com/haofanwang/inswapper)
-   and [CodeFormer](https://huggingface.co/spaces/sczhou/CodeFormer).
+3. This codebase is built on top of [FaceFusion](https://github.com/facefusion/facefusion), [inswapper](https://github.com/haofanwang/inswapper), and [CodeFormer](https://huggingface.co/spaces/sczhou/CodeFormer).
