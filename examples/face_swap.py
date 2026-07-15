@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Example client for the InSwapper FastAPI.
+"""Example client for the FaceSwap API.
 
-Demonstrates both async (queue) and sync modes.
+Demonstrates both async (queue) and sync modes with elapsed time tracking.
 """
 
 import io
@@ -62,6 +62,7 @@ def async_mode():
     }
 
     # Submit job
+    start_time = time.time()
     r = requests.post(f"{URL}/faceswap", json=payload)
     print(f"HTTP status: {r.status_code}")
     resp = r.json()
@@ -76,14 +77,17 @@ def async_mode():
         r = requests.get(f"{URL}{status_url}")
         data = r.json()
         status = data["status"]
-        print(f"  Job status: {status}")
+        elapsed = time.time() - start_time
+        print(f"  Job status: {status} ({elapsed:.1f}s)")
 
         if status == "completed":
             output = save_result_image(data["result"]["image"], "async")
             print(f"Saved: {output}")
+            print(f"Total time: {elapsed:.1f} seconds")
             break
         elif status == "failed":
             print(f"Failed: {data.get('error', 'unknown error')}")
+            print(f"Total time: {elapsed:.1f} seconds")
             break
 
         time.sleep(1)
@@ -106,16 +110,20 @@ def sync_mode():
         "face_swapper_model": FACE_SWAPPER_MODEL,
     }
 
+    start_time = time.time()
     r = requests.post(f"{URL}/faceswap/sync", json=payload)
+    elapsed = time.time() - start_time
     print(f"HTTP status: {r.status_code}")
     resp = r.json()
 
     if resp["status"] == "ok":
         output = save_result_image(resp["image"], "sync")
         print(f"Saved: {output}")
+        print(f"Total time: {elapsed:.1f} seconds")
     else:
         print(f"Error: {resp.get('msg', 'unknown')}")
         print(f"Detail: {resp.get('detail', '')}")
+        print(f"Total time: {elapsed:.1f} seconds")
 
 
 if __name__ == "__main__":
