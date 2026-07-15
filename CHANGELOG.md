@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.1] - 2026-07-16
+
+### Fixed
+- Fix Dockerfile: clone CodeFormer before running download_models.py to avoid directory conflict
+- Fix CI: add missing pytest-asyncio to requirements.txt
+- Fix CI: add asyncio_mode = auto to pytest.ini
+- Fix CI: mock cv2 in restoration tests to avoid real OpenCV calls
+
 ## [2.0.0] - 2026-07-15
 
 ### Added
