@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
 """Example client for the FaceSwap API.
 
-Demonstrates both async (queue) and sync modes with elapsed time tracking,
-model selection, face selector options, mask controls, and identity blending.
+Demonstrates async (queue), sync, and model comparison modes with Rich
+terminal formatting: progress bars, tables, panels, and live status.
 """
 
 import io
-import json
-import os
 import sys
 import time
 import uuid
-import requests
 import base64
+
+import requests
 from PIL import Image
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+from rich.table import Table
+from rich.text import Text
+
+console = Console()
 
 URL = "http://127.0.0.1:8090"
 
@@ -43,13 +49,12 @@ FACE_SWAPPER_RESOLUTION = None
 FACE_SWAPPER_WEIGHT = 1.0
 
 # Mask controls
-FACE_MASK_BLUR = 0.3       # edge softness (0.0 = sharp, 1.0 = very blurry)
-FACE_MASK_PADDING = "0,0,0,0"  # top,right,bottom,left percentage inset
+FACE_MASK_BLUR = 0.3
+FACE_MASK_PADDING = "0,0,0,0"
 
 # Face selector (target face filtering)
-FACE_SELECTOR_MODE = "many"   # "many" = all matching, "one" = best match
-FACE_SELECTOR_ORDER = "left-right"  # sort order
-# FACE_SELECTOR_ORDER = "best-worst"
+FACE_SELECTOR_MODE = "many"
+FACE_SELECTOR_ORDER = "left-right"
 # FACE_SELECTOR_GENDER = "female"
 # FACE_SELECTOR_AGE_START = 20
 # FACE_SELECTOR_AGE_END = 50
@@ -92,70 +97,132 @@ def build_payload():
     }
 
 
+def _show_config():
+    """Print current configuration in a panel."""
+    lines = [
+        f"[bold]Model:[/] {FACE_SWAPPER_MODEL}",
+        f"[bold]Weight:[/] {FACE_SWAPPER_WEIGHT}",
+        f"[bold]Selector:[/] {FACE_SELECTOR_MODE} / {FACE_SELECTOR_ORDER}",
+        f"[bold]Resolution:[/] {FACE_SWAPPER_RESOLUTION or 'auto'}",
+        f"[bold]Mask blur:[/] {FACE_MASK_BLUR}  [bold]Padding:[/] {FACE_MASK_PADDING}",
+    ]
+    console.print(Panel("\n".join(lines), title="Configuration", border_style="blue"))
+
+
+# ---------------------------------------------------------------------------
+# Async mode
+# ---------------------------------------------------------------------------
+
+STATUS_ICONS = {
+    "queued": "🕐",
+    "processing": "🔄",
+    "completed": "✅",
+    "failed": "❌",
+}
+
+STATUS_STYLES = {
+    "queued": "yellow",
+    "processing": "cyan",
+    "completed": "green",
+    "failed": "red",
+}
+
+
 def async_mode():
-    """Submit a job and poll for the result."""
-    print("=== Async mode ===")
-    print(f"Model: {FACE_SWAPPER_MODEL}  Weight: {FACE_SWAPPER_WEIGHT}  "
-          f"Selector: {FACE_SELECTOR_MODE}/{FACE_SELECTOR_ORDER}")
+    """Submit a job and poll for the result with a live progress bar."""
+    console.print(Panel("Async Mode", style="bold blue"))
+    _show_config()
 
     payload = build_payload()
-
-    # Submit job
     start_time = time.time()
+
+    # Submit
     r = requests.post(f"{URL}/faceswap", json=payload)
     resp = r.json()
 
     if r.status_code != 202:
-        print(f"Error ({r.status_code}): {resp}")
+        console.print(f"[red]Error ({r.status_code}):[/] {resp}")
         return
 
-    print(f"Job ID: {resp['job_id']}")
-
-    # Poll for completion
+    job_id = resp["job_id"]
     status_url = resp["status_url"]
-    while True:
-        r = requests.get(f"{URL}{status_url}")
-        data = r.json()
-        status = data["status"]
-        elapsed = time.time() - start_time
-        print(f"  {status} ({elapsed:.1f}s)")
+    console.print(f"Job ID: [bold cyan]{job_id}[/]")
 
-        if status == "completed":
-            output = save_result_image(data["result"]["image"], "async")
-            print(f"Saved: {output}")
-            print(f"Total time: {elapsed:.1f} seconds")
-            break
-        elif status == "failed":
-            print(f"Failed: {data.get('error', 'unknown error')}")
-            break
+    # Poll with progress bar
+    with Progress(
+        SpinnerColumn("dots"),
+        TextColumn("[progress.description]{task.description}"),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task(
+            "[yellow]queued...", total=None,
+        )
 
-        time.sleep(1)
+        while True:
+            r = requests.get(f"{URL}{status_url}")
+            data = r.json()
+            status = data["status"]
+            elapsed = time.time() - start_time
+
+            # Update spinner description
+            icon = STATUS_ICONS.get(status, "")
+            style = STATUS_STYLES.get(status, "")
+            progress.update(task, description=f"[{style}]{icon} {status}")
+
+            if status == "completed":
+                output = save_result_image(data["result"]["image"], "async")
+                progress.update(task, completed=True, description="[green]✅ completed")
+                console.print(f"[green]Saved:[/] [bold]{output}[/]")
+                console.print(
+                    f"[green]Total time:[/] [bold]{elapsed:.1f}s[/]"
+                )
+                break
+            elif status == "failed":
+                progress.update(task, description="[red]❌ failed")
+                console.print(
+                    f"[red]Failed:[/] {data.get('error', 'unknown error')}"
+                )
+                break
+
+            time.sleep(1)
+
+
+# ---------------------------------------------------------------------------
+# Sync mode
+# ---------------------------------------------------------------------------
 
 
 def sync_mode():
     """Submit a synchronous face swap request."""
-    print("=== Sync mode ===")
-    print(f"Model: {FACE_SWAPPER_MODEL}  Weight: {FACE_SWAPPER_WEIGHT}  "
-          f"Selector: {FACE_SELECTOR_MODE}/{FACE_SELECTOR_ORDER}")
+    console.print(Panel("Sync Mode", style="bold yellow"))
+    _show_config()
 
     payload = build_payload()
 
-    start_time = time.time()
-    r = requests.post(f"{URL}/faceswap/sync", json=payload)
-    elapsed = time.time() - start_time
+    with console.status("[cyan]Processing face swap...", spinner="dots"):
+        start_time = time.time()
+        r = requests.post(f"{URL}/faceswap/sync", json=payload)
+        elapsed = time.time() - start_time
     resp = r.json()
 
     if resp["status"] == "ok":
         output = save_result_image(resp["image"], "sync")
-        print(f"Saved: {output}")
-        print(f"Total time: {elapsed:.1f} seconds")
+        console.print(f"[green]Saved:[/] [bold]{output}[/]")
+        console.print(f"[green]Total time:[/] [bold]{elapsed:.1f}s[/]")
     else:
-        print(f"Error: {resp.get('msg', 'unknown')}")
-        print(f"Detail: {resp.get('detail', '')}")
+        console.print(f"[red]Error:[/] {resp.get('msg', 'unknown')}")
+        if resp.get("detail"):
+            console.print(f"[dim]{resp['detail']}[/]")
+
+
+# ---------------------------------------------------------------------------
+# Model comparison
+# ---------------------------------------------------------------------------
 
 
 def compare_models(models=None):
-    """Run the same swap across multiple models for comparison."""
+    """Run the same swap across multiple models with live progress."""
     if models is None:
         models = [
             "inswapper_128",
@@ -164,51 +231,99 @@ def compare_models(models=None):
             "ghost_1_256",
         ]
 
-    print("=== Model Comparison ===")
-    print(f"Models: {', '.join(models)}")
-    print()
+    console.print(
+        Panel(f"Comparing {len(models)} models", style="bold magenta")
+    )
+    console.print(f"Models: [italic]{', '.join(models)}[/]\n")
 
     results = {}
-    for model in models:
-        print(f"--- {model} ---")
-        payload = build_payload()
-        payload["face_swapper_model"] = model
 
-        start = time.time()
-        r = requests.post(f"{URL}/faceswap", json=payload)
-        if r.status_code != 202:
-            print(f"  Failed to submit: {r.status_code}")
-            results[model] = {"status": "error", "time": time.time() - start}
-            continue
+    with Progress(
+        SpinnerColumn("dots"),
+        TextColumn("[progress.description]{task.description}"),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        for model in models:
+            desc = f"[cyan]{model}"
+            task = progress.add_task(desc, total=None)
 
-        job = r.json()
-        status_url = job["status_url"]
+            payload = build_payload()
+            payload["face_swapper_model"] = model
 
-        while True:
-            r = requests.get(f"{URL}{status_url}")
-            data = r.json()
-            if data["status"] == "completed":
-                elapsed = time.time() - start
-                results[model] = {"status": "ok", "time": elapsed}
-                output = save_result_image(
-                    data["result"]["image"], f"compare_{model}",
+            start = time.time()
+            r = requests.post(f"{URL}/faceswap", json=payload)
+
+            if r.status_code != 202:
+                results[model] = {"status": "error", "time": time.time() - start}
+                progress.update(
+                    task, description=f"[red]{model} ✗ submit failed",
+                    completed=True,
                 )
-                print(f"  Saved: {output}")
-                print(f"  Time: {elapsed:.1f}s")
-                break
-            elif data["status"] == "failed":
-                elapsed = time.time() - start
-                results[model] = {"status": "failed", "time": elapsed}
-                print(f"  Failed: {data.get('error', 'unknown')}")
-                break
-            time.sleep(1)
+                continue
 
-    # Summary
-    print("\n=== Results ===")
-    print(f"{'Model':<30} {'Status':<10} {'Time':>8}")
-    print("-" * 50)
+            job = r.json()
+            status_url = job["status_url"]
+
+            while True:
+                r = requests.get(f"{URL}{status_url}")
+                data = r.json()
+                if data["status"] == "completed":
+                    elapsed = time.time() - start
+                    results[model] = {"status": "ok", "time": elapsed}
+                    output = save_result_image(
+                        data["result"]["image"], f"compare_{model}",
+                    )
+                    progress.update(
+                        task,
+                        description=f"[green]{model} ✓ {elapsed:.1f}s → {output}",
+                        completed=True,
+                    )
+                    break
+                elif data["status"] == "failed":
+                    elapsed = time.time() - start
+                    results[model] = {"status": "failed", "time": elapsed}
+                    progress.update(
+                        task,
+                        description=f"[red]{model} ✗ {data.get('error', 'unknown')}",
+                        completed=True,
+                    )
+                    break
+                time.sleep(1)
+
+    # Summary table
+    table = Table(title="Model Comparison Results", border_style="blue")
+    table.add_column("Model", style="cyan", no_wrap=True)
+    table.add_column("Status", justify="center")
+    table.add_column("Time", justify="right", style="green")
+
+    fastest = min(
+        (i for i in results.values() if i["status"] == "ok"),
+        key=lambda x: x["time"],
+        default=None,
+    )
+
     for model, info in results.items():
-        print(f"{model:<30} {info['status']:<10} {info['time']:>7.1f}s")
+        status_icon = "✅" if info["status"] == "ok" else "❌"
+        time_str = f"{info['time']:.1f}s"
+        if fastest and info is fastest:
+            time_str = f"[bold]{time_str} ⭐[/]"
+
+        table.add_row(model, status_icon, time_str)
+
+    console.print()
+    console.print(table)
+
+    if fastest:
+        console.print(
+            "\n[bold]⭐ Fastest:[/] "
+            f"[cyan]{list(results.keys())[list(results.values()).index(fastest)]}[/]"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 
 if __name__ == "__main__":
