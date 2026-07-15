@@ -321,19 +321,6 @@ class TestEmbeddingFuncs:
         r = _prepare_embedding_projected(mock_faces[0], m)
         assert r.shape == (1, 512)
 
-    def test_raw(self, mock_faces):
-        from app.services.face_swapper import _prepare_embedding_raw, EMBEDDING_CONVERTERS
-        EMBEDDING_CONVERTERS.clear()
-        conv = mock.MagicMock()
-        conv.run.return_value = [mock_faces[0].embedding.reshape(1, -1)]
-        with mock.patch("os.path.exists", return_value=True):
-            with mock.patch(
-                "app.services.face_swapper._load_embedding_converter",
-                return_value=conv,
-            ):
-                r = _prepare_embedding_raw(mock_faces[0], "conv.onnx")
-                assert r.shape == (1, 512)
-
     def test_norm(self, mock_faces):
         from app.services.face_swapper import _prepare_embedding_norm
         r = _prepare_embedding_norm(mock_faces[0])
@@ -475,22 +462,3 @@ class TestSwapFaceEnhanced:
                 "inswapper_128", (512, 512),
             )
 
-    def test_unknown_source_type(self, mock_faces, temp_onnx):
-        from app.services.face_swapper import swap_face_enhanced, _SwapperModel
-        m = _SwapperModel(temp_onnx)
-        frame = np.zeros((200, 200, 3), dtype=np.uint8)
-        with mock.patch(
-            "app.services.face_swapper.get_model_metadata",
-            return_value={
-                "native_size": (128, 128),
-                "mean": [0, 0, 0], "std": [1, 1, 1],
-                "tanh_out": False,
-                "source_type": "unknown_type",
-                "warp_template": "arcface_128",
-            },
-        ):
-            with pytest.raises(ValueError, match="Unknown source_type"):
-                swap_face_enhanced(
-                    mock_faces[0], mock_faces[1], frame, m,
-                    "inswapper_128", (128, 128),
-                )

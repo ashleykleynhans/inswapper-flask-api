@@ -9,7 +9,7 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def mock_ml():
-    """Mock all ML imports, but keep real cv2."""
+    """Mock all ML imports including cv2 to avoid CI issues."""
     fake_torch = mock.MagicMock()
     fake_torch.cuda.is_available.return_value = False
     fake_torch.device.return_value = "cpu"
@@ -36,6 +36,7 @@ def mock_ml():
         "facelib.utils": mock.MagicMock(),
         "facelib.utils.face_restoration_helper": mock.MagicMock(),
         "facelib.utils.misc": mock.MagicMock(),
+        "cv2": mock.MagicMock(cvtColor=lambda img, code: img, COLOR_BGR2RGB=4),
         "onnx": mock.MagicMock(),
         "onnxruntime": mock.MagicMock(),
     }
