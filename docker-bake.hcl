@@ -7,7 +7,7 @@ variable "REGISTRY_USER" {
 }
 
 variable "APP" {
-    default = "inswapper-flask-api"
+    default = "faceswap-api"
 }
 
 variable "RELEASE" {
@@ -30,8 +30,8 @@ target "default" {
     dockerfile = "Dockerfile"
     tags = ["${REGISTRY}/${REGISTRY_USER}/${APP}:${RELEASE}"]
     annotations = [
-        "org.opencontainers.image.title=${APP}",
-        "org.opencontainers.image.description=FastAPI-powered face swapping API with 13 models, CodeFormer restoration, and VRAM-safe serial queue",
+        "org.opencontainers.image.title=FaceSwap API",
+        "org.opencontainers.image.description=GPU-accelerated face swapping API with 13 models, CodeFormer restoration, and VRAM-safe serial queue",
         "org.opencontainers.image.version=${RELEASE}",
         "org.opencontainers.image.vendor=ashleykleynhans",
         "org.opencontainers.image.source=https://github.com/ashleykleynhans/${APP}",

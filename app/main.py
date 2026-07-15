@@ -1,7 +1,7 @@
-"""InSwapper FastAPI application.
+"""FaceSwap FastAPI application.
 
 Replaces the old Flask app.py with FastAPI, async queue, and the full
-enhanced face swap pipeline from runpod-worker-inswapper.
+enhanced face swap pipeline.
 """
 
 import argparse
@@ -106,7 +106,7 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle for the FastAPI application."""
     # --- Startup ---
     init_logging()
-    logger.info("Starting InSwapper API...")
+    logger.info("Starting FaceSwap API...")
 
     # Add CodeFormer to sys.path (needed for basicsr/facelib imports)
     codeformer_path = str(CODEFORMER_CODE_DIR)
@@ -178,7 +178,7 @@ async def lifespan(app: FastAPI):
 # ---------------------------------------------------------------------------
 
 app = FastAPI(
-    title="InSwapper API",
+    title="FaceSwap API",
     version="2.0.0",
     description="GPU-accelerated face swapping API with 13 models, "
     "CodeFormer restoration, and VRAM-safe serial queue processing.",
@@ -243,7 +243,7 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
 
 def get_args() -> argparse.Namespace:  # pragma: no cover
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description="InSwapper REST API")
+    parser = argparse.ArgumentParser(description="FaceSwap REST API")
     parser.add_argument(
         "-p", "--port",
         help="Port to listen on",

@@ -1,4 +1,4 @@
-"""Centralized configuration for the InSwapper API."""
+"""Centralized configuration for the FaceSwap API."""
 
 import os
 import sys

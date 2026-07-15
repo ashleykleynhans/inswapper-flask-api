@@ -2,6 +2,10 @@
 
 ## [2.0.1] - 2026-07-16
 
+### Changed
+- Renamed project from inswapper-flask-api to FaceSwap API (faceswap-api)
+- Updated GitHub repository description and tags
+
 ### Fixed
 - Fix Dockerfile: clone CodeFormer before running download_models.py to avoid directory conflict
 - Fix CI: add missing pytest-asyncio to requirements.txt

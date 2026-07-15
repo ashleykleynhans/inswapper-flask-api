@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for InSwapper API tests."""
+"""Shared pytest fixtures for FaceSwap API tests."""
 
 import sys
 from unittest.mock import MagicMock, patch

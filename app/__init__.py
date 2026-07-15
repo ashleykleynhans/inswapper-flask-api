@@ -1,1 +1,1 @@
-"""InSwapper API — FastAPI face swapping service."""
+"""FaceSwap API — GPU-accelerated face swapping service."""

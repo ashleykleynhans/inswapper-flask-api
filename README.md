@@ -1,6 +1,6 @@
-# inswapper-flask-api
+# FaceSwap API
 
-FastAPI-powered face swapping and restoration API with 13 face swap models,
+GPU-accelerated face swapping API with 13 face swap models,
 CodeFormer restoration, and VRAM-safe serial queue processing.
 
 Powered by [insightface](https://github.com/deepinsight/insightface).
@@ -76,8 +76,8 @@ or rights. The author assumes no liability for any misuse.
 ### Clone this repository
 
 ```bash
-git clone https://github.com/ashleykleynhans/inswapper-flask-api.git
-cd inswapper-flask-api
+git clone https://github.com/ashleykleynhans/faceswap-api.git
+cd faceswap-api
 ```
 
 ### Install the required Python dependencies

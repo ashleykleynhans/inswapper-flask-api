@@ -1,1 +1,1 @@
-"""InSwapper service layer."""
+"""FaceSwap service layer."""
