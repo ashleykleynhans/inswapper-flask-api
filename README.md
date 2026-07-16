@@ -82,9 +82,19 @@ cd faceswap-api
 
 ### Install the required Python dependencies
 
-#### Linux and Mac
+#### Linux
 
 ```
+apt update && apt -y install git-lfs
+python3 -m venv .venv
+source .venv/bin/activate
+pip3 install -r requirements.txt
+```
+
+#### Mac
+
+```
+brew install git-lfs
 python3 -m venv .venv
 source .venv/bin/activate
 pip3 install -r requirements.txt
@@ -104,6 +114,7 @@ For Runpod GPU pods, install PyTorch with CUDA 12.4 support before
 installing the other dependencies:
 
 ```bash
+apt update && apt -y install git-lfs
 python3 -m venv .venv
 source .venv/bin/activate
 pip3 install torch==2.6.0+cu124 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
