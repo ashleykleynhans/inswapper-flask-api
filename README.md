@@ -271,7 +271,7 @@ with CodeFormer Face Restoration enabled.
 |---------------------------------------------|---------------|
 | macOS Tahoe 26.5.2 on Apple M5 Pro 16"      | 38.8 seconds  |
 | Ubuntu 22.04 LTS on t3a.xlarge AWS instance | 248.1 seconds |
-| Ubuntu 22.04 LTS on a 4090 Runpod GPU pod | 14.2 seconds  |
+| Ubuntu 22.04 LTS on a 4090 Runpod GPU pod   | 11.6 seconds  |
 | Windows 10                                  | 103.9 seconds |
 
 Get a [Runpod](https://runpod.io?ref=2xxro4sy) account.
