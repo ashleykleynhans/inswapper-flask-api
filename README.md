@@ -98,6 +98,19 @@ python3 -m venv .venv
 pip3 install -r requirements.txt
 ```
 
+#### Runpod
+
+For Runpod GPU pods, install PyTorch with CUDA 12.4 support before
+installing the other dependencies:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip3 install torch==2.6.0+cu124 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+pip3 install onnxruntime-gpu
+pip3 install -r requirements.txt
+```
+
 ## Download Models
 
 Three sets of model files are needed before the API can start.
@@ -246,7 +259,7 @@ with CodeFormer Face Restoration enabled.
 |---------------------------------------------|---------------|
 | macOS Tahoe 26.5.2 on Apple M5 Pro 16"      | 38.8 seconds  |
 | Ubuntu 22.04 LTS on t3a.xlarge AWS instance | 248.1 seconds |
-| Ubuntu 22.04 LTS on an A5000 Runpod GPU pod | 14.2 seconds  |
+| Ubuntu 22.04 LTS on a 4090 Runpod GPU pod | 14.2 seconds  |
 | Windows 10                                  | 103.9 seconds |
 
 Get a [Runpod](https://runpod.io?ref=2xxro4sy) account.
