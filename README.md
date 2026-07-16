@@ -115,11 +115,23 @@ pip3 install -r requirements.txt
 
 Three sets of model files are needed before the API can start.
 
-### 1. Face swap models and detection weights
+### 1. Clone the CodeFormer repository
+
+[Git Large File Storage](
+https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage)
+must be installed before running this command:
+
+```bash
+git lfs install
+git clone https://huggingface.co/spaces/sczhou/CodeFormer
+```
+
+### 2. Face swap models and detection weights
 
 The download script fetches all 13 face swapper ONNX models, 3 embedding
 converters, the insightface buffalo_l face detection model, and CodeFormer
-restoration weights (~5.3 GB total):
+restoration weights (~5.3 GB total).  **Clone CodeFormer first**, as the
+script places weights under the CodeFormer directory tree.
 
 ```bash
 pip3 install tqdm requests
@@ -132,17 +144,6 @@ This places files under:
 - `CodeFormer/CodeFormer/weights/` — codeformer.pth, retinaface, parsing, RealESRGAN
 
 Already-downloaded files are skipped on re-run (checked by file size).
-
-### 2. Clone the CodeFormer repository
-
-[Git Large File Storage](
-https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage)
-must be installed before running this command:
-
-```bash
-git lfs install
-git clone https://huggingface.co/spaces/sczhou/CodeFormer
-```
 
 ### 3. Verify
 
